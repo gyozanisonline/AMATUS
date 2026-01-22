@@ -1,0 +1,25 @@
+.magnet-dots-container {
+    display: grid;
+    justify-items: center;
+    align-items: center;
+    overflow: hidden;
+    /* Use fixed positioning to cover the screen */
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    /* Ensure it doesn't block clicks */
+    pointer-events: none;
+}
+
+/* Re-enable pointer events on the window, but the background itself 
+   technically doesn't need to capture them since we listen on window. 
+   However, if we wanted hover effects strictly, we'd need pointer-events auto.
+   But we use window listener, so it's fine. 
+*/
+
+.magnet-dots-container span {
+    display: block;
+    transition: background-color 0.1s ease-out;
+    will-change: background-color;
+}
