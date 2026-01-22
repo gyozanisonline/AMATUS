@@ -9,6 +9,11 @@ import './index.css';
 import './index.css';
 import logoHorizontal from '/assets/logo-horizontal.png?inline';
 
+// Image imports
+import ofekImg from '/assets/ofek.png?inline';
+import yoelImg from '/assets/yoel.jpg?inline';
+import otherImg from '/assets/other.jpg?inline';
+
 function App() {
   const [showIntro, setShowIntro] = useState(true);
 
@@ -29,22 +34,25 @@ function App() {
   // Dummy data for personnel
   const teamMembers = [
     {
-      name: "ALEXANDER DOE",
-      role: "SENIOR DEVELOPER",
+      name: "OFEK BAR",
+      role: "FOUNDER",
       idNumber: "8901-2345-6789",
-      color: "#d9393f"
+      color: "#d9393f",
+      imageUrl: ofekImg
     },
     {
-      name: "SARAH SMITH",
-      role: "DESIGN LEAD",
+      name: "YOEL ZAJDNER",
+      role: "LEAD DESIGN",
       idNumber: "7721-9988-1122",
-      color: "#ffffff"
+      color: "#ffffff",
+      imageUrl: yoelImg
     },
     {
-      name: "MICHAEL CHEN",
-      role: "SYSTEM ARCHITECT",
+      name: "OTHER GUY",
+      role: "OTHER GUY",
       idNumber: "4455-6677-8899",
-      color: "#d9393f"
+      color: "#d9393f",
+      imageUrl: otherImg
     }
   ];
 
@@ -127,6 +135,8 @@ function App() {
                   role={member.role}
                   idNumber={member.idNumber}
                   color={member.color}
+                  imageUrl={member.imageUrl}
+                  blurStrength={2} // Low blur as requested
                   overlayColor="rgba(217, 57, 63, 0.1)" // Slight red tint
                 />
               ))}
