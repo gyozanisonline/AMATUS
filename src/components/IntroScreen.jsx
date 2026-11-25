@@ -1,24 +1,29 @@
-import { motion } from 'framer-motion';
-import monograph from '/assets/monograph.svg?inline';
+import { motion as Motion } from 'framer-motion';
+
+// The monograph turns once, then the page fades in. Shown once per visit;
+// skipped when the visitor asks for reduced motion.
+
+const monograph = `${import.meta.env.BASE_URL}img/monograph.svg`;
 
 const IntroScreen = ({ onComplete }) => {
     return (
-        <motion.div
+        <Motion.div
             initial={{ opacity: 1 }}
             animate={{ opacity: 0 }}
-            transition={{ duration: 0.5, delay: 2.5 }}
+            transition={{ duration: 0.35, delay: 1.0, ease: 'easeOut' }}
             onAnimationComplete={onComplete}
             className="fixed inset-0 z-50 flex items-center justify-center bg-white"
+            aria-hidden="true"
         >
-            <motion.img
+            <Motion.img
                 src={monograph}
-                alt="Amatus Monograph"
-                initial={{ rotate: 0 }}
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, ease: "linear", repeat: Infinity }}
+                alt=""
+                initial={{ rotate: -120, scale: 0.9 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
                 className="h-32 w-32"
             />
-        </motion.div>
+        </Motion.div>
     );
 };
 

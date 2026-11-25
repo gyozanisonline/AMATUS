@@ -1,121 +1,148 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import './MagnetDots.css';
 
+// Red dot grid behind the page. Dots near the pointer fade to white.
+// Spacing stays square at any screen size; dot centres are measured once
+// per resize, not on every pointer move.
+
+const hexToRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+function gridFor(spacing) {
+    if (typeof window === 'undefined') return { cols: 20, rows: 20 };
+    return {
+        cols: Math.max(6, Math.round(window.innerWidth / spacing)),
+        rows: Math.max(6, Math.round(window.innerHeight / spacing)),
+    };
+}
+
 export default function MagnetDots({
-    rows = 20,
-    columns = 20,
-    containerSize = '100%',
-    baseColor = '#d9393f', // Amatus Red
-    activeColor = '#ffffff', // White
+    spacing = 64, // target distance between dots, in px
+    baseColor = '#d9393f',
+    activeColor = '#ffffff',
     dotSize = '4px',
-    radius = 210, // Interaction radius in pixels
+    radius = 210,
+    clearPad = 14, // px of breathing room around cleared content
     className = '',
-    style = {}
+    style = {},
 }) {
     const containerRef = useRef(null);
+    const [grid, setGrid] = useState(() => gridFor(spacing));
+
+    useEffect(() => {
+        let t;
+        const onResize = () => {
+            clearTimeout(t);
+            t = setTimeout(() => setGrid(gridFor(spacing)), 120);
+        };
+        window.addEventListener('resize', onResize);
+        return () => {
+            clearTimeout(t);
+            window.removeEventListener('resize', onResize);
+        };
+    }, [spacing]);
 
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
+        const items = [...container.querySelectorAll('span')];
+        const base = hexToRgb(baseColor);
+        const active = hexToRgb(activeColor);
+        let centers = [];
+        let raf = 0;
+        let pointer = null;
 
-        const items = container.querySelectorAll('span');
-
-        // Helper to interpolate colors
-        const interpolateColor = (color1, color2, factor) => {
-            // Simple hex interpolation assumption (can use a library or helper if needed, but simple linear works for robust hexes)
-            // Since we know our specific colors (#d9393f and #ffffff), we can optimize or do standard bitwise.
-            const r1 = parseInt(color1.slice(1, 3), 16);
-            const g1 = parseInt(color1.slice(3, 5), 16);
-            const b1 = parseInt(color1.slice(5, 7), 16);
-
-            const r2 = parseInt(color2.slice(1, 3), 16);
-            const g2 = parseInt(color2.slice(3, 5), 16);
-            const b2 = parseInt(color2.slice(5, 7), 16);
-
-            const r = Math.round(r1 + factor * (r2 - r1));
-            const g = Math.round(g1 + factor * (g2 - g1));
-            const b = Math.round(b1 + factor * (b2 - b1));
-
-            return `rgb(${r}, ${g}, ${b})`;
-        };
-
-        const onPointerMove = pointer => {
-            items.forEach(item => {
-                const rect = item.getBoundingClientRect();
-                const centerX = rect.x + rect.width / 2;
-                const centerY = rect.y + rect.height / 2;
-
-                const b = pointer.x - centerX;
-                const a = pointer.y - centerY;
-                const dist = Math.sqrt(a * a + b * b);
-
-                // Calculate intensity based on distance (0 to 1)
-                // If distance < radius, we interpolate towards activeColor
-                let intensity = 0;
-                if (dist < radius) {
-                    intensity = 1 - (dist / radius);
-                }
-
-                // CSS variable for color
-                const color = interpolateColor(baseColor, activeColor, intensity);
-                item.style.backgroundColor = color;
+        const measure = () => {
+            centers = items.map((el) => {
+                const r = el.getBoundingClientRect();
+                return [r.x + r.width / 2, r.y + r.height / 2];
             });
         };
 
-        const handleMove = (e) => {
-            onPointerMove({ x: e.clientX, y: e.clientY });
+        const paint = () => {
+            raf = 0;
+            if (!pointer) return;
+            for (let i = 0; i < items.length; i++) {
+                const dx = pointer.x - centers[i][0];
+                const dy = pointer.y - centers[i][1];
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const k = dist < radius ? 1 - dist / radius : 0;
+                const c = base.map((b, j) => Math.round(b + k * (active[j] - b)));
+                items[i].style.backgroundColor = `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+            }
         };
 
-        window.addEventListener('pointermove', handleMove);
+        const onMove = (e) => {
+            pointer = { x: e.clientX, y: e.clientY };
+            if (!raf) raf = requestAnimationFrame(paint);
+        };
 
-        // Initial position center check
-        if (items.length) {
-            const middleIndex = Math.floor(items.length / 2);
-            const rect = items[middleIndex].getBoundingClientRect();
-            onPointerMove({ x: rect.x, y: rect.y });
-        }
+        // Dots step aside: any dot under an element marked data-dots-clear
+        // fades out, and returns once that element scrolls past.
+        let clearRaf = 0;
+        const clear = () => {
+            clearRaf = 0;
+            // data-dots-clear="40" widens the clear zone to 40px around the element
+            const rects = [...document.querySelectorAll('[data-dots-clear]')].map((el) => {
+                const r = el.getBoundingClientRect();
+                const pad = Number(el.dataset.dotsClear) || clearPad;
+                return { left: r.left - pad, right: r.right + pad, top: r.top - pad, bottom: r.bottom + pad };
+            });
+            for (let i = 0; i < items.length; i++) {
+                const [x, y] = centers[i];
+                const hidden = rects.some(
+                    (r) =>
+                        x > r.left && x < r.right && y > r.top && y < r.bottom
+                );
+                items[i].style.opacity = hidden ? '0' : '1';
+            }
+        };
+        const queueClear = () => {
+            if (!clearRaf) clearRaf = requestAnimationFrame(clear);
+        };
+        const onResize = () => {
+            measure();
+            queueClear();
+        };
 
+        measure();
+        clear();
+        // content can shift after fonts and images load
+        const settle = setTimeout(queueClear, 600);
+        const ro = new ResizeObserver(queueClear);
+        ro.observe(document.body);
+        window.addEventListener('pointermove', onMove, { passive: true });
+        window.addEventListener('scroll', queueClear, { passive: true });
+        window.addEventListener('resize', onResize);
         return () => {
-            window.removeEventListener('pointermove', handleMove);
+            cancelAnimationFrame(raf);
+            cancelAnimationFrame(clearRaf);
+            clearTimeout(settle);
+            ro.disconnect();
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('scroll', queueClear);
+            window.removeEventListener('resize', onResize);
         };
-    }, [baseColor, activeColor, radius]);
+    }, [grid, baseColor, activeColor, radius, clearPad]);
 
-    // Dynamically calculate grid to cover screen roughly 
-    // For now, using passed prop or responsive CSS grid, 
-    // but generating enough spans is key.
-    // We'll generate a grid that fills the viewport.
-    // Let's rely on CSS Grid to layout, but React needs to render 'total' items.
-    // We'll trust the user/parent to pass appropriate row/col or CSS vars.
-    // Actually, to cover "all the background", we need A LOT of dots.
-    // Let's assume a standard dense grid.
-
-    const total = rows * columns;
-    const spans = Array.from({ length: total }, (_, i) => (
-        <span
-            key={i}
-            style={{
-                backgroundColor: baseColor,
-                width: dotSize,
-                height: dotSize,
-                borderRadius: '50%'
-            }}
-        />
-    ));
+    const total = grid.cols * grid.rows;
 
     return (
         <div
             ref={containerRef}
+            aria-hidden="true"
             className={`magnet-dots-container ${className}`}
             style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                gridTemplateRows: `repeat(${rows}, 1fr)`,
-                width: containerSize,
-                height: containerSize,
-                ...style
+                gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
+                gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+                ...style,
             }}
         >
-            {spans}
+            {Array.from({ length: total }, (_, i) => (
+                <span
+                    key={i}
+                    style={{ backgroundColor: baseColor, width: dotSize, height: dotSize }}
+                />
+            ))}
         </div>
     );
 }
